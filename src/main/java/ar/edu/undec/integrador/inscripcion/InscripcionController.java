@@ -6,6 +6,7 @@ import ar.edu.undec.integrador.socio.Socio;
 import ar.edu.undec.integrador.socio.SocioRepository;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,9 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/inscripciones")
 public class InscripcionController {
+
+    public record EstadoRequest(EstadoInscripcion estado) {
+    }
 
     private final InscripcionRepository repository;
     private final ActividadRepository actividadRepository;
@@ -68,6 +72,35 @@ public class InscripcionController {
         return ResponseEntity
                 .created(URI.create("/api/inscripciones/" + guardada.getId()))
                 .body(guardada);
+    }
+
+    @PatchMapping("/{id}/estado")
+    public Inscripcion cambiarEstado(@PathVariable Long id,
+                                     @RequestBody EstadoRequest request) {
+        if (request.estado() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta el estado");
+        }
+
+        Inscripcion inscripcion = buscar(id);
+        EstadoInscripcion nuevo = request.estado();
+
+        boolean transicionValida = inscripcion.getEstado() == EstadoInscripcion.CONFIRMADA
+                && (nuevo == EstadoInscripcion.ASISTIO || nuevo == EstadoInscripcion.CANCELADA);
+        if (!transicionValida) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Transición no permitida: de " + inscripcion.getEstado() + " a " + nuevo);
+        }
+
+        if (nuevo == EstadoInscripcion.CANCELADA) {
+            LocalDateTime limite = inscripcion.getActividad().getFechaHora().minusHours(2);
+            if (!LocalDateTime.now().isBefore(limite)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "No se puede cancelar: faltan menos de 2 horas para la actividad");
+            }
+        }
+
+        inscripcion.setEstado(nuevo);
+        return repository.save(inscripcion);
     }
 
     private Inscripcion buscar(Long id) {

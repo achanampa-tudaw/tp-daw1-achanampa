@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,9 +17,6 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/inscripciones")
 public class InscripcionController {
-
-    public record EstadoRequest(EstadoInscripcion estado) {
-    }
 
     private final InscripcionRepository repository;
     private final ActividadRepository actividadRepository;
@@ -45,61 +43,64 @@ public class InscripcionController {
     @PostMapping
     public ResponseEntity<Inscripcion> crear(@Valid @RequestBody InscripcionRequest request) {
         Actividad actividad = actividadRepository.findById(request.actividadId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Actividad no encontrada"));
-        Socio socio = socioRepository.findById(request.socioId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Socio no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Actividad no encontrada"));
 
-        long ocupados = repository.countByActividadIdAndEstadoNot(
-                actividad.getId(), EstadoInscripcion.CANCELADA);
-        if (ocupados >= actividad.getCupo()) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "No hay lugar: el cupo está completo");
+        Socio socio = socioRepository.findById(request.socioId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Socio no encontrado"));
+
+        // Regla 1: No hay lugar si las inscripciones no canceladas ya llegan al cupo
+        long inscriptos = repository.countByActividadIdAndEstadoNot(actividad.getId(), EstadoInscripcion.CANCELADA);
+        if (inscriptos >= actividad.getCupo()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No hay cupo disponible para esta actividad");
         }
 
+        // Regla 2: Un socio no puede inscribirse dos veces a la misma actividad (salvo cancelada)
         if (repository.existsByActividadIdAndSocioIdAndEstadoNot(
                 actividad.getId(), socio.getId(), EstadoInscripcion.CANCELADA)) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "El socio ya está inscripto a esta actividad");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El socio ya está inscripto en esta actividad");
         }
 
         Inscripcion inscripcion = new Inscripcion();
         inscripcion.setActividad(actividad);
         inscripcion.setSocio(socio);
-        Inscripcion guardada = repository.save(inscripcion);
+        inscripcion.setEstado(EstadoInscripcion.CONFIRMADA);
 
+        Inscripcion guardada = repository.save(inscripcion);
         return ResponseEntity
                 .created(URI.create("/api/inscripciones/" + guardada.getId()))
                 .body(guardada);
     }
 
     @PatchMapping("/{id}/estado")
-    public Inscripcion cambiarEstado(@PathVariable Long id,
-                                     @RequestBody EstadoRequest request) {
-        if (request.estado() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Falta el estado");
-        }
-
+    public Inscripcion cambiarEstado(@PathVariable Long id, @RequestBody Map<String, String> body) {
         Inscripcion inscripcion = buscar(id);
-        EstadoInscripcion nuevo = request.estado();
 
-        boolean transicionValida = inscripcion.getEstado() == EstadoInscripcion.CONFIRMADA
-                && (nuevo == EstadoInscripcion.ASISTIO || nuevo == EstadoInscripcion.CANCELADA);
-        if (!transicionValida) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Transición no permitida: de " + inscripcion.getEstado() + " a " + nuevo);
+        if (body == null || !body.containsKey("estado") || body.get("estado") == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debe indicar el nuevo estado");
         }
 
-        if (nuevo == EstadoInscripcion.CANCELADA) {
+        EstadoInscripcion nuevoEstado;
+        try {
+            nuevoEstado = EstadoInscripcion.valueOf(body.get("estado"));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado inválido");
+        }
+
+        // Estados finales: ASISTIO y CANCELADA no permiten transición
+        if (inscripcion.getEstado() != EstadoInscripcion.CONFIRMADA || nuevoEstado == EstadoInscripcion.CONFIRMADA) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Transición de estado no permitida");
+        }
+
+        // Regla 3: No se puede cancelar si faltan menos de 2 horas para la actividad
+        if (nuevoEstado == EstadoInscripcion.CANCELADA) {
             LocalDateTime limite = inscripcion.getActividad().getFechaHora().minusHours(2);
             if (!LocalDateTime.now().isBefore(limite)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "No se puede cancelar: faltan menos de 2 horas para la actividad");
+                        "No se puede cancelar con menos de 2 horas de anticipación");
             }
         }
 
-        inscripcion.setEstado(nuevo);
+        inscripcion.setEstado(nuevoEstado);
         return repository.save(inscripcion);
     }
 

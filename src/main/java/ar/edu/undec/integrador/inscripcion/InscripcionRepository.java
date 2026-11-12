@@ -25,5 +25,6 @@ public interface InscripcionRepository extends JpaRepository<Inscripcion, Long> 
     List<Inscripcion> findByActividadId(@Param("actividadId") Long actividadId);
 
     @Query("select count(i) > 0 from Inscripcion i where i.actividad.id = :actividadId")
-    boolean existsByActividadId(@Param("actividadId") Long actividadId);
+    boolean existsByActividadId(@Param("actividadId") Long actividadId);@Query("select count(i) > 0 from Inscripcion i where i.socio.id = :socioId")
+    boolean existsBySocioId(@Param("socioId") Long socioId);
 }

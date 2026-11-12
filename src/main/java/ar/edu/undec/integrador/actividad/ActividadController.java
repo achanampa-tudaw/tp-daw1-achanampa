@@ -1,5 +1,7 @@
 package ar.edu.undec.integrador.actividad;
 
+import ar.edu.undec.integrador.inscripcion.Inscripcion;
+import ar.edu.undec.integrador.inscripcion.InscripcionRepository;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.time.LocalDate;
@@ -15,9 +17,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class ActividadController {
 
     private final ActividadRepository repository;
+    private final InscripcionRepository inscripcionRepository;
 
-    public ActividadController(ActividadRepository repository) {
+    public ActividadController(ActividadRepository repository,
+                               InscripcionRepository inscripcionRepository) {
         this.repository = repository;
+        this.inscripcionRepository = inscripcionRepository;
     }
 
     @GetMapping
@@ -34,6 +39,12 @@ public class ActividadController {
     @GetMapping("/{id}")
     public Actividad obtener(@PathVariable Long id) {
         return buscar(id);
+    }
+
+    @GetMapping("/{id}/inscripciones")
+    public List<Inscripcion> inscripciones(@PathVariable Long id) {
+        buscar(id);
+        return inscripcionRepository.findByActividadId(id);
     }
 
     @PostMapping
@@ -57,6 +68,10 @@ public class ActividadController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> borrar(@PathVariable Long id) {
         buscar(id);
+        if (inscripcionRepository.existsByActividadId(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La actividad tiene inscripciones y no se puede borrar");
+        }
         repository.deleteById(id);
         return ResponseEntity.noContent().build();
     }

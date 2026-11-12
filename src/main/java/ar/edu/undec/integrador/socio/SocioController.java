@@ -1,5 +1,6 @@
 package ar.edu.undec.integrador.socio;
 
+import ar.edu.undec.integrador.inscripcion.InscripcionRepository;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -13,9 +14,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class SocioController {
 
     private final SocioRepository repository;
+    private final InscripcionRepository inscripcionRepository;
 
-    public SocioController(SocioRepository repository) {
+    public SocioController(SocioRepository repository,
+                           InscripcionRepository inscripcionRepository) {
         this.repository = repository;
+        this.inscripcionRepository = inscripcionRepository;
     }
 
     @GetMapping
@@ -48,6 +52,10 @@ public class SocioController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> borrar(@PathVariable Long id) {
         buscar(id);
+        if (inscripcionRepository.existsBySocioId(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El socio tiene inscripciones y no se puede borrar");
+        }
         repository.deleteById(id);
         return ResponseEntity.noContent().build();
     }

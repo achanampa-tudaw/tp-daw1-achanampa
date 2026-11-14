@@ -15,6 +15,7 @@ En Windows PowerShell, desde la raíz del repositorio (`integrador`):
 
 ```powershell
 .\mvnw.cmd spring-boot:run
+```
 La API queda disponible en `http://localhost:8080/api`.
 
 - **Consola H2:** `http://localhost:8080/h2-console`

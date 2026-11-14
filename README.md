@@ -1,6 +1,6 @@
 # TP Integrador DAW1 — Gimnasio
 
-**Alumno/a:** [ANABEL CHANAMPA  ] · **Legajo:** [510134]  
+**Alumno/a:** ANABEL CHANAMPA   · **Legajo:** 510134 
 **Enunciado elegido:** Gimnasio
 
 ## Descripción

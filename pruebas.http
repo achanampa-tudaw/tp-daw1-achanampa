@@ -1,0 +1,111 @@
+---
+
+### 2. Archivo `pruebas.http`
+
+Creá un archivo nuevo en la carpeta raíz (`integrador`) llamado **`pruebas.http`** (fijate que termina en `.http`) y pegale este contenido:
+
+```http
+### 1. Crear actividad válida (201 Created)
+POST http://localhost:8080/api/actividades
+Content-Type: application/json
+
+{
+  "nombre": "Spinning",
+  "fechaHora": "2026-12-20T18:00:00",
+  "cupo": 1
+}
+
+### 2. Crear actividad con datos inválidos - fecha pasada y cupo 0 (400 Bad Request)
+POST http://localhost:8080/api/actividades
+Content-Type: application/json
+
+{
+  "nombre": "",
+  "fechaHora": "2020-01-01T10:00:00",
+  "cupo": 0
+}
+
+### 3. Listar todas las actividades (200 OK)
+GET http://localhost:8080/api/actividades
+
+### 4. Filtrar actividades por fecha (200 OK)
+GET http://localhost:8080/api/actividades?fecha=2026-12-20
+
+### 5. Crear primer socio válido (201 Created)
+POST http://localhost:8080/api/socios
+Content-Type: application/json
+
+{
+  "nombre": "Ana Perez",
+  "email": "ana@test.com"
+}
+
+### 6. Crear segundo socio válido (201 Created)
+POST http://localhost:8080/api/socios
+Content-Type: application/json
+
+{
+  "nombre": "Juan Gomez",
+  "email": "juan@test.com"
+}
+
+### 7. Crear socio con email inválido (400 Bad Request)
+POST http://localhost:8080/api/socios
+Content-Type: application/json
+
+{
+  "nombre": "Sin Email",
+  "email": "no-es-un-email"
+}
+
+### 8. Inscribir socio 1 en actividad 1 (201 Created)
+POST http://localhost:8080/api/inscripciones
+Content-Type: application/json
+
+{
+  "actividadId": 1,
+  "socioId": 1
+}
+
+### 9. Intentar inscribir al mismo socio 1 otra vez - duplicado (409 Conflict)
+POST http://localhost:8080/api/inscripciones
+Content-Type: application/json
+
+{
+  "actividadId": 1,
+  "socioId": 1
+}
+
+### 10. Intentar inscribir al socio 2 sin cupo disponible (409 Conflict)
+POST http://localhost:8080/api/inscripciones
+Content-Type: application/json
+
+{
+  "actividadId": 1,
+  "socioId": 2
+}
+
+### 11. Consultar inscripciones de la actividad 1 (200 OK)
+GET http://localhost:8080/api/actividades/1/inscripciones
+
+### 12. Intentar borrar actividad con inscripciones (409 Conflict)
+DELETE http://localhost:8080/api/actividades/1
+
+### 13. Cancelar inscripción 1 (200 OK)
+PATCH http://localhost:8080/api/inscripciones/1/estado
+Content-Type: application/json
+
+{
+  "estado": "CANCELADA"
+}
+
+### 14. Intentar pasar inscripción ya cancelada a ASISTIO - estado final (409 Conflict)
+PATCH http://localhost:8080/api/inscripciones/1/estado
+Content-Type: application/json
+
+{
+  "estado": "ASISTIO"
+}
+
+### 15. Consultar recurso inexistente (404 Not Found)
+GET http://localhost:8080/api/socios/999
